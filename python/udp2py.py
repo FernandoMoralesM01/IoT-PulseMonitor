@@ -10,13 +10,9 @@ from collections import deque
 import threading
 
 # UDP Configuration
-udp_ip = "192.168.1.69"
+udp_ip = "someip"
 udp_port = 12345
 
-
-
-#udp_ip = "172.174.210.23"
-#udp_port = 8000
 
 fs = 100  # Sampling frequency
 buffer_size = 10 * fs  # Buffer size for 5 seconds of data

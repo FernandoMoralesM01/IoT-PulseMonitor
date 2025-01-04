@@ -6,17 +6,13 @@
 //const char* ssid = "INFINITUM9A90";
 //const char* password = "DJag9JyC6c";
 
-const char* ssid = "TP-LINK_92834A";
-const char* password = "14189548";
+const char* ssid = "ssid";
+const char* password = "pswd";
 
 
 // UDP configuration
-const char* udpAddress = "192.168.1.69"; // Replace with the host computer's IP
+const char* udpAddress = "someip"; // Replace with the host computer's IP
 const int udpPort = 12345;
-
-
-//const char* udpAddress = "172.174.210.23"; // Replace with the host computer's IP
-//const int udpPort = 8000;
 
 
 // Sensor configuration

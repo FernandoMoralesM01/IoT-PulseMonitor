@@ -3,11 +3,11 @@
 #include "MAX30105.h"
 
 // Wi-Fi credentials
-const char* ssid = "TP-LINK_92834A";
-const char* password = "14189548";
+const char* ssid = "ssid";
+const char* password = "psswd";
 
 // UDP configuration
-const char* udpAddress = "192.168.1.69"; // Replace with the host computer's IP
+const char* udpAddress = "someip"; // Replace with the host computer's IP
 const int udpPort = 12345;
 
 // Sensor configuration for MAX30105
