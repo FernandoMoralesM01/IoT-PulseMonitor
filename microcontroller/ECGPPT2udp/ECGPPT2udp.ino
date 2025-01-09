@@ -3,11 +3,11 @@
 #include "MAX30105.h"
 
 // Wi-Fi credentials
-const char* ssid = "ssid";
-const char* password = "psswd";
+const char* ssid = "TP-LINK_92834A";
+const char* password = "14189548";
 
 // UDP configuration
-const char* udpAddress = "someip"; // Replace with the host computer's IP
+const char* udpAddress = "192.168.1.69"; // Replace with the host computer's IP
 const int udpPort = 12345;
 
 // Sensor configuration for MAX30105
@@ -70,6 +70,37 @@ void setup() {
   Serial.println("Setup complete.");
 }
 
+float b_ecg[] = {0.48083843,  0.        , -0.96167686,  0.        ,  0.48083843};
+float a_ecg[] = { 1.        , -1.17455937, -0.21696622,  0.14704836,  0.25232463};
+
+float b_ppt[] = { 0.13432327,  0.        , -0.13432327};
+float a_ppt[] = { 1.        , -1.72963133,  0.73135345};
+
+float x_ecg[5] = {0, 0, 0, 0, 0};
+float y_ecg[5] = {0, 0, 0, 0, 0};
+
+float x_ppt[3] = {0, 0, 0};
+float y_ppt[3] = {0, 0, 0};
+
+float applyFilter(float input, float* x, float* y, float* b, float* a, int order) {
+  // Shift buffers
+  for (int i = order; i > 0; i--) {
+    x[i] = x[i - 1];
+    y[i] = y[i - 1];
+  }
+
+  // Add new input
+  x[0] = input;
+
+  // Apply the filter equation
+  y[0] = b[0] * x[0];
+  for (int i = 1; i <= order; i++) {
+    y[0] += b[i] * x[i] - a[i] * y[i];
+  }
+
+  return y[0];
+}
+
 void loop() {
   // Acquire sensor data
   if (dataReady) {
@@ -80,10 +111,12 @@ void loop() {
     float redValue = particleSensor.getRed();
 
     // Read analog sensor data
-    uint32_t signal = analogReadMilliVolts(A0);
-
+    float signal = analogReadMilliVolts(A0);
+    float filteredECG = applyFilter(signal, x_ecg, y_ecg, b_ecg, a_ecg, 4);
+    float filteredirValue= applyFilter(irValue, x_ppt, y_ppt, b_ppt, a_ppt, 2);
+    float filteredredValue = applyFilter(irValue, x_ppt, y_ppt, b_ppt, a_ppt, 2);
     // Combine data into a single UDP packet
-    String dataPacket = String(irValue) + "," + String(redValue) + "," + String(signal);
+    String dataPacket = String(filteredirValue) + "," + String(redValue) + "," + String(filteredECG);
 
     // Send data via UDP
     udp.beginPacket(udpAddress, udpPort);

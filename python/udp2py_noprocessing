@@ -15,13 +15,13 @@ udp_port = 12345
 
 
 fs = 100  # Sampling frequency
-buffer_size = 10 * fs  # Buffer size for 5 seconds of data
+buffer_size = 5 * fs  # Buffer size for 5 seconds of data
 
 # Butterworth bandpass filter (0.5-4 Hz)
-[b_ppt, a_ppt] = sgnl.butter(1, [(0.5 * 2) / fs, (5 * 2) / fs], 'band')
-[b_ecg, a_ecg] = sgnl.butter(5, [(5 * 2) / fs, (45 * 2) / fs], 'band')
+#[b_ppt, a_ppt] = sgnl.butter(1, [(0.5 * 2) / fs, (5 * 2) / fs], 'band')
+[b_ecg, a_ecg] = sgnl.butter(5, [(5 * 2) / fs, (40 * 2) / fs], 'band')
 
-zi_ppt = sgnl.lfilter_zi(b_ppt, a_ppt)
+#zi_ppt = sgnl.lfilter_zi(b_ppt, a_ppt)
 zi_ecg = sgnl.lfilter_zi(b_ecg, a_ecg)
 
 
@@ -37,7 +37,7 @@ def cleanup_and_exit(signum, frame):
     sock.close()
     sys.exit(0)
 
-def calculate_hrv(peaks, fs=50):
+def calculate_hrv(peaks, fs=100):
     rr_intervals = np.diff(peaks) / fs
     if len(rr_intervals) < 2:
         return 0
@@ -115,21 +115,21 @@ fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8))  # Create two subplots
 line_ir, = ax1.plot([], [], lw=2, label="IR Signal")
 line_red, = ax1.plot([], [], lw=2, color='k', label="Red Signal")
 line_peaks, = ax1.plot([], [], lw=2, marker='o', color='r', label="Peaks")
-#ax1.set_ylim(-100, 100)
+ax1.set_ylim(-2, 2)
 ax1.set_xlim(0, buffer_size)
 ax1.set_title("PPT")
 
 line_hrv, = ax2.plot([], [], lw=2, color='b', label="Heart Rate Variability (HRV)")
 ax2.set_title("Heart Rate Variability (HRV)")
 ax2.set_ylabel("HRV (BPM)")
-ax2.set_ylim(60, 100)
-ax2.set_xlim(0, buffer_size)
+ax2.set_ylim(40, 100)
+ax2.set_xlim(0, 20)
 ax2.hlines(60, 0, 60, colors='r', linestyles='dashed', label="Target")
 
-find_peaks_params = {'height': 0.5, 'distance': fs // 2}
+find_peaks_params = {'height': 0.6, 'distance': fs // 3}
 counter = 0
-hrv_values = deque(maxlen=60)
-spo2_values = deque(maxlen=60)
+hrv_values = deque(maxlen=20)
+spo2_values = deque(maxlen=20)
 
 # Define thread for data reception
 def receive_data():
@@ -159,7 +159,12 @@ def process_data():
                 data_buffer_red_np = np.array(data_buffer_red)
                 data_buffer_ecg_np = np.array(data_buffer_ecg)
 
-                data_buffer_ir_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_ir_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
+                data_buffer_ir_np /= np.max(data_buffer_ir_np)
+                data_buffer_red_np /= np.max(data_buffer_red_np)
+                data_buffer_ecg_np /= np.max(data_buffer_ecg_np)
+
+                data_buffer_ir_np *= 0.6
+                #data_buffer_ir_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_ir_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
                 #data_buffer_red_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_red_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
 
                 data_buffer_ecg_np, zi_new = sgnl.lfilter(b_ecg, a_ecg, data_buffer_ecg_np, zi=zi_ecg * data_buffer_ecg_np[0])[-buffer_size:]
@@ -167,14 +172,15 @@ def process_data():
                 ## Preprocess and find peaks
                 #spo2 = calculate_spo2(data_buffer_ir_np, data_buffer_red_np)
                 #spo2_values.append(spo2)
-                data_buffer_ir_np = preprocess(data_buffer_ir_np)
+                #data_buffer_ir_np = preprocess(data_buffer_ir_np)
                 #data_buffer_red_np = preprocess(data_buffer_red_np)
-                #peaks, _ = sgnl.find_peaks(data_buffer_red_np, **find_peaks_params)
+                peaks, _ = sgnl.find_peaks(data_buffer_ecg_np, **find_peaks_params)
 
                 # Calculate HRV
-                #if len(peaks) > 1:
-                #    hrv = calculate_hrv(peaks)
-                #    hrv_values.append(hrv)
+                if len(peaks) > 1:
+                    hrv = calculate_hrv(peaks)
+                    hrv_values.append(hrv)
+                    
             time.sleep(0.01)  # Sleep to prevent overloading the CPU
 
     except KeyboardInterrupt:
@@ -197,16 +203,16 @@ try:
 
             # Update plot data
             line_ir.set_data(range(len(data_buffer_ir_np)), data_buffer_ir_np)
-            #line_red.set_data(range(len(data_buffer_red_np)), data_buffer_red_np)
-            
-            #line_peaks.set_data(peaks, data_buffer_red_np[peaks])
-            ax1.set_ylim(np.min([data_buffer_ir_np]), np.max([data_buffer_ir_np]))
-            #if len(hrv_values) > 1:
-            #    hrv_values_np = np.array(spo2_values)
-            #    line_hrv.set_data(range(len(spo2_values)), spo2_values)
-            line_hrv.set_data(range(len(data_buffer_ecg_np)), data_buffer_ecg_np)
-            ax2.set_ylim(np.min([data_buffer_ecg_np]), np.max([data_buffer_ecg_np]))
 
+            #line_red.set_data(range(len(data_buffer_red_np)), data_buffer_red_np)
+            line_red.set_data(range(len(data_buffer_ecg_np)), data_buffer_ecg_np)
+            
+            line_peaks.set_data(peaks, data_buffer_red_np[peaks])
+            #ax1.set_ylim(np.min([data_buffer_ir_np]), np.max([data_buffer_ir_np]))
+            if len(hrv_values) > 1:
+                hrv_values_np = np.array(hrv_values)
+                line_hrv.set_data(range(len(hrv_values)), hrv_values)
+            
             plt.pause(0.05)  # Reduced pause to improve performance
 except KeyboardInterrupt:
     print("Program exited.")

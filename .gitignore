@@ -1,0 +1,23 @@
+# Ignore the large file
+data/part_1.mat
+data
+# Ignore all .mat files in the data folder
+data/*.mat
+
+# Ignore node_modules (if you have Node.js projects)
+node_modules/
+
+# Ignore Python bytecode
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore log files
+*.log
+
+# Ignore IDE configurations (example: VS Code)
+.vscode/
+
+# Ignore OS-specific files (macOS, Windows)
+.DS_Store
+Thumbs.db
