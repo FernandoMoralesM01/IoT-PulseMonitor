@@ -2,7 +2,7 @@
 #include "MAX30105.h"
 
 // Constants for sensor configuration
-constexpr byte LED_BRIGHTNESS = 0x1F; // 0=Off to 255=50mA
+constexpr byte LED_BRIGHTNESS = 0x3F; // 0=Off to 255=50mA
 constexpr byte SAMPLE_AVERAGE = 4;    // Reduced for faster acquisition
 constexpr byte LED_MODE = 2;          // Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
 constexpr int SAMPLE_RATE = 400;      //  // Options: 50, 100, 200, 400, 800, 1000, 1600, 3200

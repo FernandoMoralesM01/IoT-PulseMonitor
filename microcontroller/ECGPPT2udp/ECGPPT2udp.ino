@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include "MAX30105.h"
 
+#define MAX_LENWIN 500
 // Wi-Fi credentials
 const char* ssid = "TP-LINK_92834A";
 const char* password = "14189548";
@@ -38,6 +39,14 @@ void IRAM_ATTR acquireDataISR() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
+float ir_arr[MAX_LENWIN];
+float red_arr[MAX_LENWIN];
+
+float filtir_arr[MAX_LENWIN];
+float filtred_arr[MAX_LENWIN];
+
+
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing...");
@@ -67,7 +76,17 @@ void setup() {
   timerAlarmWrite(timer, 1000000 / SAMPLE_RATE, true); // Trigger at the sample rate
   timerAlarmEnable(timer);
 
+  for(int i = 0; i < ir_arr[i]!=NULL; i++)
+  {
+    ir_arr[i] = 0;
+    red_arr[i] = 0;
+    filtir_arr[i] = 0;
+    filtred_arr[i] = 0;
+  }
+
   Serial.println("Setup complete.");
+
+
 }
 
 float b_ecg[] = {0.48083843,  0.        , -0.96167686,  0.        ,  0.48083843};
@@ -79,20 +98,23 @@ float a_ppt[] = { 1.        , -1.72963133,  0.73135345};
 float x_ecg[5] = {0, 0, 0, 0, 0};
 float y_ecg[5] = {0, 0, 0, 0, 0};
 
-float x_ppt[3] = {0, 0, 0};
-float y_ppt[3] = {0, 0, 0};
+
+
+float x_ir[3] = {0, 0, 0};
+float y_ir[3] = {0, 0, 0};
+
+float x_red[3] = {0, 0, 0};
+float y_red[3] = {0, 0, 0};
+
 
 float applyFilter(float input, float* x, float* y, float* b, float* a, int order) {
-  // Shift buffers
   for (int i = order; i > 0; i--) {
     x[i] = x[i - 1];
     y[i] = y[i - 1];
   }
 
-  // Add new input
   x[0] = input;
 
-  // Apply the filter equation
   y[0] = b[0] * x[0];
   for (int i = 1; i <= order; i++) {
     y[0] += b[i] * x[i] - a[i] * y[i];
@@ -101,29 +123,74 @@ float applyFilter(float input, float* x, float* y, float* b, float* a, int order
   return y[0];
 }
 
+int index_count = 0;
+
+float get_mean(float *arr)
+{
+  int i;
+  float value = 0;
+  for(i = 0; arr[i]!= NULL; i++)
+    value += arr[i];
+  return value /= i;
+}
+
+float get_peak2peak_distance(float *arr)
+{
+  float min_val = 10000;
+  float max_val = -10000;
+  int i;
+  for(i = 0; arr[i]!=NULL; i++)
+    if (arr[i] < min_val)
+      min_val = arr[i];
+  
+    if (arr[i] > max_val)
+      max_val = arr[i];
+    
+    return (max_val - min_val);
+}
+
+float get_spo2(float *arr_ir, float *arr_red, float *filt_ir, float *filt_red)
+{
+  float ir_DC = get_mean(arr_ir);
+  float red_DC = get_mean(arr_red);
+
+  float ir_AC = get_peak2peak_distance(filt_ir);
+  float red_AC = get_peak2peak_distance(filt_red);
+
+  float R = (red_AC / red_DC) / (ir_AC / ir_DC);
+  float a = 1.5958422;
+  float b = -34.6596622;
+  float c = 112.6898759 ;
+  return (a * (R*R) + b*R + c);
+}
+
 void loop() {
-  // Acquire sensor data
   if (dataReady) {
     dataReady = false;
-
-    // Read MAX30105 data
+    
+    if (index_count >= 300);
+      index_count = 0;
+    
     float irValue = particleSensor.getIR();
     float redValue = particleSensor.getRed();
 
-    // Read analog sensor data
+    ir_arr[index_count] = irValue;
+    red_arr[index_count] = redValue;
+    
+    float spo2 = get_spo2(ir_arr, red_arr, filtir_arr, filtred_arr);
+
     float signal = analogReadMilliVolts(A0);
     float filteredECG = applyFilter(signal, x_ecg, y_ecg, b_ecg, a_ecg, 4);
-    float filteredirValue= applyFilter(irValue, x_ppt, y_ppt, b_ppt, a_ppt, 2);
-    float filteredredValue = applyFilter(irValue, x_ppt, y_ppt, b_ppt, a_ppt, 2);
-    // Combine data into a single UDP packet
-    String dataPacket = String(filteredirValue) + "," + String(redValue) + "," + String(filteredECG);
+    float filteredirValue= applyFilter(irValue, x_ir, y_ir, b_ppt, a_ppt, 2);
+    float filteredredValue = applyFilter(redValue, x_red, y_red, b_ppt, a_ppt, 2);
+    filtir_arr[index_count] = filteredirValue;
+    filtred_arr[index_count] = filteredredValue;
+    String dataPacket = String(filteredirValue) + "," + String(filteredredValue) + "," + String(filteredECG) + "," + String(spo2);
 
-    // Send data via UDP
     udp.beginPacket(udpAddress, udpPort);
     udp.print(dataPacket);
     udp.endPacket();
+    index_count += 1;
 
-    // Debugging
-    // Serial.println("Sent: " + dataPacket);
   }
 }

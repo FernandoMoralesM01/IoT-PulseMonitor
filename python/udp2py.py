@@ -113,9 +113,9 @@ plt.ion()
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8))  # Create two subplots
 
 line_ir, = ax1.plot([], [], lw=2, label="IR Signal")
-line_red, = ax1.plot([], [], lw=2, color='k', label="Red Signal")
-line_peaks, = ax1.plot([], [], lw=2, marker='o', color='r', label="Peaks")
-#ax1.set_ylim(-100, 100)
+line_red, = ax1.plot([], [], lw=2, color='r', label="Red Signal")
+line_peaks, = ax1.plot([], [], lw=2, marker='o', color='k', label="Peaks")
+ax1.set_ylim(-5, 5)
 ax1.set_xlim(0, buffer_size)
 ax1.set_title("PPT")
 
@@ -139,10 +139,12 @@ def receive_data():
             data, addr = sock.recvfrom(1024)
             decoded_data = data.decode('utf-8').strip()
             try:
-                ir_value, red_value, ecg_value = map(float, decoded_data.split(","))
+                ir_value, red_value, ecg_value, spo2_value = map(float, decoded_data.split(","))
                 data_buffer_ir.append(ir_value)
                 data_buffer_red.append(red_value)
                 data_buffer_ecg.append(ecg_value)
+                
+                print(f"SPO2: {spo2_value}")
             except ValueError:
                 print(f"Malformed data: {decoded_data}")
     except KeyboardInterrupt:
@@ -159,16 +161,16 @@ def process_data():
                 data_buffer_red_np = np.array(data_buffer_red)
                 data_buffer_ecg_np = np.array(data_buffer_ecg)
 
-                data_buffer_ir_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_ir_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
+                #data_buffer_ir_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_ir_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
                 #data_buffer_red_np, zi_new = sgnl.lfilter(b_ppt, a_ppt, data_buffer_red_np, zi=zi_ppt * data_buffer_ir_np[0])[-buffer_size:]
 
-                data_buffer_ecg_np, zi_new = sgnl.lfilter(b_ecg, a_ecg, data_buffer_ecg_np, zi=zi_ecg * data_buffer_ecg_np[0])[-buffer_size:]
+                #data_buffer_ecg_np, zi_new = sgnl.lfilter(b_ecg, a_ecg, data_buffer_ecg_np, zi=zi_ecg * data_buffer_ecg_np[0])[-buffer_size:]
                 #data_buffer_red_np, zi_new = sgnl.lfilter(b, a, data_buffer_red_np, zi=zi * data_buffer_ir_np[0])[-buffer_size:]
                 ## Preprocess and find peaks
                 #spo2 = calculate_spo2(data_buffer_ir_np, data_buffer_red_np)
                 #spo2_values.append(spo2)
                 data_buffer_ir_np = preprocess(data_buffer_ir_np)
-                #data_buffer_red_np = preprocess(data_buffer_red_np)
+                data_buffer_red_np = preprocess(data_buffer_red_np)
                 #peaks, _ = sgnl.find_peaks(data_buffer_red_np, **find_peaks_params)
 
                 # Calculate HRV
@@ -197,15 +199,15 @@ try:
 
             # Update plot data
             line_ir.set_data(range(len(data_buffer_ir_np)), data_buffer_ir_np)
-            #line_red.set_data(range(len(data_buffer_red_np)), data_buffer_red_np)
+            line_red.set_data(range(len(data_buffer_red_np)), data_buffer_red_np)
             
             #line_peaks.set_data(peaks, data_buffer_red_np[peaks])
-            ax1.set_ylim(np.min([data_buffer_ir_np]), np.max([data_buffer_ir_np]))
+            #ax1.set_ylim(np.min([data_buffer_ir_np]), np.max([data_buffer_ir_np]))
             #if len(hrv_values) > 1:
             #    hrv_values_np = np.array(spo2_values)
             #    line_hrv.set_data(range(len(spo2_values)), spo2_values)
             line_hrv.set_data(range(len(data_buffer_ecg_np)), data_buffer_ecg_np)
-            ax2.set_ylim(np.min([data_buffer_ecg_np]), np.max([data_buffer_ecg_np]))
+            #ax2.set_ylim(np.min([data_buffer_ecg_np]), np.max([data_buffer_ecg_np]))
 
             plt.pause(0.05)  # Reduced pause to improve performance
 except KeyboardInterrupt:
